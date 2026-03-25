@@ -1,8 +1,8 @@
-// Version 7.0 - Add-On Service Selection
+// Version 8.0 - Booking History & Reporting
 
 import java.util.*;
 
-// Domain Model: Room
+// Room Model
 class Room {
     private String type;
     private double price;
@@ -21,7 +21,7 @@ class Room {
     }
 }
 
-// Add-On Service Model
+// Add-On Service
 class AddOnService {
     private String name;
     private double cost;
@@ -60,23 +60,23 @@ class Reservation {
         return reservationId;
     }
 
+    public Room getRoom() {
+        return room;
+    }
+
+    public double getTotalCost() {
+        return totalCost;
+    }
+
     public void addService(AddOnService service) {
         services.add(service);
         totalCost += service.getCost();
     }
 
-    public void displayDetails() {
-        System.out.println("\n--- Reservation Details ---");
-        System.out.println("Reservation ID: " + reservationId);
-        System.out.println("Room Type: " + room.getType());
-        System.out.println("Base Price: " + room.getPrice());
-
-        System.out.println("Add-On Services:");
-        for (AddOnService s : services) {
-            System.out.println("- " + s.getName() + " : " + s.getCost());
-        }
-
-        System.out.println("Total Cost: " + totalCost);
+    public void display() {
+        System.out.println("Reservation ID: " + reservationId +
+                ", Room: " + room.getType() +
+                ", Total Cost: " + totalCost);
     }
 }
 
@@ -104,8 +104,47 @@ class RoomInventory {
     }
 }
 
+// Booking History (NEW)
+class BookingHistory {
+    private List<Reservation> history;
+
+    public BookingHistory() {
+        history = new ArrayList<>();
+    }
+
+    public void addReservation(Reservation reservation) {
+        history.add(reservation);
+    }
+
+    public void showAllBookings() {
+        System.out.println("\n--- Booking History ---");
+        for (Reservation r : history) {
+            r.display();
+        }
+    }
+
+    // Reporting: Total Revenue
+    public void generateReport() {
+        double totalRevenue = 0;
+
+        for (Reservation r : history) {
+            totalRevenue += r.getTotalCost();
+        }
+
+        System.out.println("\n--- Report ---");
+        System.out.println("Total Bookings: " + history.size());
+        System.out.println("Total Revenue: " + totalRevenue);
+    }
+}
+
 // Reservation Service
 class ReservationService {
+
+    private BookingHistory history;
+
+    public ReservationService(BookingHistory history) {
+        this.history = history;
+    }
 
     public Reservation bookRoom(RoomInventory inventory, Room room) {
 
@@ -116,12 +155,14 @@ class ReservationService {
 
             Reservation reservation = new Reservation(room);
 
-            System.out.println("\nBooking CONFIRMED!");
-            System.out.println("Reservation ID: " + reservation.getReservationId());
+            // Save to history
+            history.addReservation(reservation);
+
+            System.out.println("Booking CONFIRMED! ID: " + reservation.getReservationId());
 
             return reservation;
         } else {
-            System.out.println("\nBooking FAILED! No rooms available.");
+            System.out.println("Booking FAILED!");
             return null;
         }
     }
@@ -132,30 +173,31 @@ public class BookMyStay {
 
     public static void main(String[] args) {
 
-        // Step 1: Setup Inventory
+        // Setup
         RoomInventory inventory = new RoomInventory();
-        inventory.addRoomType("Suite", 1);
+        inventory.addRoomType("Single", 2);
 
-        // Step 2: Room
-        Room suite = new Room("Suite", 5000);
+        Room single = new Room("Single", 1000);
 
-        // Step 3: Booking
-        ReservationService service = new ReservationService();
-        Reservation reservation = service.bookRoom(inventory, suite);
+        BookingHistory history = new BookingHistory();
+        ReservationService service = new ReservationService(history);
 
-        if (reservation != null) {
-
-            // Step 4: Add-On Services
-            AddOnService wifi = new AddOnService("WiFi", 500);
-            AddOnService breakfast = new AddOnService("Breakfast", 800);
-            AddOnService spa = new AddOnService("Spa", 1500);
-
-            reservation.addService(wifi);
-            reservation.addService(breakfast);
-            reservation.addService(spa);
-
-            // Step 5: Display final bill
-            reservation.displayDetails();
+        // Booking 1
+        Reservation r1 = service.bookRoom(inventory, single);
+        if (r1 != null) {
+            r1.addService(new AddOnService("WiFi", 200));
         }
+
+        // Booking 2
+        Reservation r2 = service.bookRoom(inventory, single);
+        if (r2 != null) {
+            r2.addService(new AddOnService("Breakfast", 300));
+        }
+
+        // Show history
+        history.showAllBookings();
+
+        // Generate report
+        history.generateReport();
     }
 }
