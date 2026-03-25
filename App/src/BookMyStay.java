@@ -1,4 +1,4 @@
-// Version 8.0 - Booking History & Reporting
+// Version 9.0 - Error Handling & Validation
 
 import java.util.*;
 
@@ -8,6 +8,12 @@ class Room {
     private double price;
 
     public Room(String type, double price) {
+        if (type == null || type.isEmpty()) {
+            throw new IllegalArgumentException("Room type cannot be empty");
+        }
+        if (price <= 0) {
+            throw new IllegalArgumentException("Invalid room price");
+        }
         this.type = type;
         this.price = price;
     }
@@ -27,6 +33,12 @@ class AddOnService {
     private double cost;
 
     public AddOnService(String name, double cost) {
+        if (name == null || name.isEmpty()) {
+            throw new IllegalArgumentException("Service name cannot be empty");
+        }
+        if (cost < 0) {
+            throw new IllegalArgumentException("Invalid service cost");
+        }
         this.name = name;
         this.cost = cost;
     }
@@ -40,7 +52,7 @@ class AddOnService {
     }
 }
 
-// Reservation Entity
+// Reservation
 class Reservation {
     private static int counter = 1;
 
@@ -50,6 +62,10 @@ class Reservation {
     private double totalCost;
 
     public Reservation(Room room) {
+        if (room == null) {
+            throw new IllegalArgumentException("Room cannot be null");
+        }
+
         this.reservationId = counter++;
         this.room = room;
         this.services = new ArrayList<>();
@@ -60,15 +76,14 @@ class Reservation {
         return reservationId;
     }
 
-    public Room getRoom() {
-        return room;
-    }
-
     public double getTotalCost() {
         return totalCost;
     }
 
     public void addService(AddOnService service) {
+        if (service == null) {
+            throw new IllegalArgumentException("Service cannot be null");
+        }
         services.add(service);
         totalCost += service.getCost();
     }
@@ -89,51 +104,50 @@ class RoomInventory {
     }
 
     public void addRoomType(String type, int count) {
+        if (type == null || type.isEmpty()) {
+            throw new IllegalArgumentException("Room type cannot be empty");
+        }
+        if (count < 0) {
+            throw new IllegalArgumentException("Invalid room count");
+        }
         inventory.put(type, count);
     }
 
     public int getAvailability(String type) {
-        return inventory.getOrDefault(type, 0);
+        if (!inventory.containsKey(type)) {
+            throw new IllegalArgumentException("Room type not found: " + type);
+        }
+        return inventory.get(type);
     }
 
     public void reduceAvailability(String type) {
         int current = getAvailability(type);
-        if (current > 0) {
-            inventory.put(type, current - 1);
+        if (current <= 0) {
+            throw new IllegalStateException("No rooms available for: " + type);
         }
+        inventory.put(type, current - 1);
     }
 }
 
-// Booking History (NEW)
+// Booking History
 class BookingHistory {
-    private List<Reservation> history;
+    private List<Reservation> history = new ArrayList<>();
 
-    public BookingHistory() {
-        history = new ArrayList<>();
-    }
-
-    public void addReservation(Reservation reservation) {
-        history.add(reservation);
+    public void addReservation(Reservation r) {
+        if (r == null) {
+            throw new IllegalArgumentException("Reservation cannot be null");
+        }
+        history.add(r);
     }
 
     public void showAllBookings() {
         System.out.println("\n--- Booking History ---");
+        if (history.isEmpty()) {
+            System.out.println("No bookings found.");
+        }
         for (Reservation r : history) {
             r.display();
         }
-    }
-
-    // Reporting: Total Revenue
-    public void generateReport() {
-        double totalRevenue = 0;
-
-        for (Reservation r : history) {
-            totalRevenue += r.getTotalCost();
-        }
-
-        System.out.println("\n--- Report ---");
-        System.out.println("Total Bookings: " + history.size());
-        System.out.println("Total Revenue: " + totalRevenue);
     }
 }
 
@@ -147,22 +161,25 @@ class ReservationService {
     }
 
     public Reservation bookRoom(RoomInventory inventory, Room room) {
+        try {
+            int available = inventory.getAvailability(room.getType());
 
-        int available = inventory.getAvailability(room.getType());
+            if (available > 0) {
+                inventory.reduceAvailability(room.getType());
 
-        if (available > 0) {
-            inventory.reduceAvailability(room.getType());
+                Reservation reservation = new Reservation(room);
+                history.addReservation(reservation);
 
-            Reservation reservation = new Reservation(room);
+                System.out.println("Booking CONFIRMED! ID: " + reservation.getReservationId());
+                return reservation;
 
-            // Save to history
-            history.addReservation(reservation);
+            } else {
+                System.out.println("Booking FAILED! No rooms available.");
+                return null;
+            }
 
-            System.out.println("Booking CONFIRMED! ID: " + reservation.getReservationId());
-
-            return reservation;
-        } else {
-            System.out.println("Booking FAILED!");
+        } catch (Exception e) {
+            System.out.println("Error during booking: " + e.getMessage());
             return null;
         }
     }
@@ -173,31 +190,32 @@ public class BookMyStay {
 
     public static void main(String[] args) {
 
-        // Setup
-        RoomInventory inventory = new RoomInventory();
-        inventory.addRoomType("Single", 2);
+        try {
+            RoomInventory inventory = new RoomInventory();
+            inventory.addRoomType("Single", 1);
 
-        Room single = new Room("Single", 1000);
+            Room room = new Room("Single", 1000);
 
-        BookingHistory history = new BookingHistory();
-        ReservationService service = new ReservationService(history);
+            BookingHistory history = new BookingHistory();
+            ReservationService service = new ReservationService(history);
 
-        // Booking 1
-        Reservation r1 = service.bookRoom(inventory, single);
-        if (r1 != null) {
-            r1.addService(new AddOnService("WiFi", 200));
+            // Valid booking
+            Reservation r1 = service.bookRoom(inventory, room);
+
+            // Invalid booking (no rooms left)
+            Reservation r2 = service.bookRoom(inventory, room);
+
+            // Invalid service example
+            if (r1 != null) {
+                r1.addService(new AddOnService("WiFi", 200));
+                // Uncomment below to test error
+                // r1.addService(new AddOnService("", -50));
+            }
+
+            history.showAllBookings();
+
+        } catch (Exception e) {
+            System.out.println("System Error: " + e.getMessage());
         }
-
-        // Booking 2
-        Reservation r2 = service.bookRoom(inventory, single);
-        if (r2 != null) {
-            r2.addService(new AddOnService("Breakfast", 300));
-        }
-
-        // Show history
-        history.showAllBookings();
-
-        // Generate report
-        history.generateReport();
     }
 }
