@@ -1,4 +1,4 @@
-// Version 6.0 - Reservation Confirmation & Room Allocation
+// Version 7.0 - Add-On Service Selection
 
 import java.util.*;
 
@@ -21,28 +21,66 @@ class Room {
     }
 }
 
+// Add-On Service Model
+class AddOnService {
+    private String name;
+    private double cost;
+
+    public AddOnService(String name, double cost) {
+        this.name = name;
+        this.cost = cost;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public double getCost() {
+        return cost;
+    }
+}
+
 // Reservation Entity
 class Reservation {
     private static int counter = 1;
 
     private int reservationId;
-    private String roomType;
+    private Room room;
+    private List<AddOnService> services;
+    private double totalCost;
 
-    public Reservation(String roomType) {
-        this.reservationId = counter++; // unique ID
-        this.roomType = roomType;
+    public Reservation(Room room) {
+        this.reservationId = counter++;
+        this.room = room;
+        this.services = new ArrayList<>();
+        this.totalCost = room.getPrice();
     }
 
     public int getReservationId() {
         return reservationId;
     }
 
-    public String getRoomType() {
-        return roomType;
+    public void addService(AddOnService service) {
+        services.add(service);
+        totalCost += service.getCost();
+    }
+
+    public void displayDetails() {
+        System.out.println("\n--- Reservation Details ---");
+        System.out.println("Reservation ID: " + reservationId);
+        System.out.println("Room Type: " + room.getType());
+        System.out.println("Base Price: " + room.getPrice());
+
+        System.out.println("Add-On Services:");
+        for (AddOnService s : services) {
+            System.out.println("- " + s.getName() + " : " + s.getCost());
+        }
+
+        System.out.println("Total Cost: " + totalCost);
     }
 }
 
-// Inventory (Centralized State)
+// Inventory
 class RoomInventory {
     private HashMap<String, Integer> inventory;
 
@@ -66,32 +104,24 @@ class RoomInventory {
     }
 }
 
-// Allocation + Confirmation Service
+// Reservation Service
 class ReservationService {
 
-    public Reservation confirmBooking(RoomInventory inventory, String roomType) {
+    public Reservation bookRoom(RoomInventory inventory, Room room) {
 
-        System.out.println("\nProcessing booking for: " + roomType);
-
-        int available = inventory.getAvailability(roomType);
+        int available = inventory.getAvailability(room.getType());
 
         if (available > 0) {
+            inventory.reduceAvailability(room.getType());
 
-            // Step 1: Allocate room (reduce count)
-            inventory.reduceAvailability(roomType);
+            Reservation reservation = new Reservation(room);
 
-            // Step 2: Create reservation
-            Reservation reservation = new Reservation(roomType);
-
-            // Step 3: Confirmation
-            System.out.println("Booking CONFIRMED!");
+            System.out.println("\nBooking CONFIRMED!");
             System.out.println("Reservation ID: " + reservation.getReservationId());
-            System.out.println("Room Type: " + reservation.getRoomType());
 
             return reservation;
-
         } else {
-            System.out.println("Booking FAILED! No rooms available.");
+            System.out.println("\nBooking FAILED! No rooms available.");
             return null;
         }
     }
@@ -104,16 +134,28 @@ public class BookMyStay {
 
         // Step 1: Setup Inventory
         RoomInventory inventory = new RoomInventory();
-        inventory.addRoomType("Single", 1);
         inventory.addRoomType("Suite", 1);
 
-        // Step 2: Reservation Service
+        // Step 2: Room
+        Room suite = new Room("Suite", 5000);
+
+        // Step 3: Booking
         ReservationService service = new ReservationService();
+        Reservation reservation = service.bookRoom(inventory, suite);
 
-        // Step 3: Booking Requests
-        service.confirmBooking(inventory, "Single"); // success
-        service.confirmBooking(inventory, "Single"); // fail
+        if (reservation != null) {
 
-        service.confirmBooking(inventory, "Suite");  // success
+            // Step 4: Add-On Services
+            AddOnService wifi = new AddOnService("WiFi", 500);
+            AddOnService breakfast = new AddOnService("Breakfast", 800);
+            AddOnService spa = new AddOnService("Spa", 1500);
+
+            reservation.addService(wifi);
+            reservation.addService(breakfast);
+            reservation.addService(spa);
+
+            // Step 5: Display final bill
+            reservation.displayDetails();
+        }
     }
 }
